@@ -30,7 +30,7 @@ def get_gemini_response(input_prompt, image=None):
     
     genai.configure(api_key=api_key)
     # Use Flash model for speed
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-pro')
     
     try:
         if image:
