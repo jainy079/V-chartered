@@ -188,21 +188,32 @@ init_db()
 # 🍪 LOGIN MANAGER (TOP PRIORITY)
 # ==========================================
 # Isko sabse upar rakha hai taaki refresh hone par sabse pehle ye load ho
-cookie_manager = stx.CookieManager(key="dark_auth")
+# ==========================================
+# 🔐 LOGIN (REFRESH FIX WALA CODE 🛠️)
+# ==========================================
+cookie_manager = stx.CookieManager(key="spy_auth")
+
+# 👇 YE HAI MAGIC LINE (Refresh problem ka ilaaj)
+# Hum code ko aadha second rok rahe hain taaki browser cookie padh sake
+time.sleep(0.5)
 
 if 'user_name' not in st.session_state: st.session_state['user_name'] = None
 if 'user_email' not in st.session_state: st.session_state['user_email'] = None
 if 'current_page' not in st.session_state: st.session_state['current_page'] = "Home"
 
-# Cookie Logic
+# Cookie Auto-Login
 cookie_email = cookie_manager.get(cookie='v_email')
 cookie_user = cookie_manager.get(cookie='v_user')
 
-# Agar session khali hai par cookie hai, toh login karo
+# Agar cookie mili, toh Session mein daal do (Login Bypass)
 if cookie_email and not st.session_state['user_email']:
     st.session_state['user_email'] = cookie_email
     st.session_state['user_name'] = cookie_user
-    log_activity(cookie_email, "Auto-Login", "Via Cookie")
+    try:
+        log_activity(cookie_email, "Auto-Login", "Refreshed Page")
+    except:
+        pass
+    st.rerun() # Page ko reload karo taaki login dikh jaye
 
 # ==========================================
 # 🔐 LOGIN SCREEN (DARK MODE)
