@@ -5,12 +5,11 @@ import time
 import sqlite3
 import hashlib
 import pandas as pd
-import plotly.express as px
 import extra_streamlit_components as stx 
 import datetime
 
 # ==========================================
-# 🛡️ SECURE SETUP
+# 🛡️ SECURE SETUP (API KEY)
 # ==========================================
 try:
     if "GOOGLE_API_KEY" in st.secrets:
@@ -35,62 +34,32 @@ CA_FINAL_SUBJECTS = ["Financial Reporting (FR)", "Advanced Financial Management 
 CA_INTER_SUBJECTS = ["Advanced Accounting", "Corporate Laws", "Taxation", "Costing", "Auditing", "FM-SM"]
 
 # ==========================================
-# 🎨 DARK MODE & MOBILE CSS (APP LOOK)
+# 🎨 DARK MODE & MOBILE CSS
 # ==========================================
 st.markdown("""
 <style>
-    /* 1. DARK THEME BACKGROUND */
-    .stApp {
-        background-color: #0E1117;
-        color: #FAFAFA;
-    }
+    /* Dark Theme & UI */
+    .stApp { background-color: #0E1117; color: #FAFAFA; }
+    .stTextInput > div > div > input { background-color: #262730; color: white; border: 1px solid #41444C; }
+    .stSelectbox > div > div > div { background-color: #262730; color: white; }
     
-    /* 2. INPUT FIELDS STYLING (Dark Mode) */
-    .stTextInput > div > div > input {
-        background-color: #262730;
-        color: white;
-        border: 1px solid #41444C;
-    }
-    .stSelectbox > div > div > div {
-        background-color: #262730;
-        color: white;
-    }
-
-    /* 3. APP-STYLE CARDS */
+    /* Feature Cards */
     .feature-card {
-        background-color: #1F2937; /* Dark Grey */
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-        text-align: center;
-        border: 1px solid #374151;
-        margin-bottom: 15px;
+        background-color: #1F2937; padding: 20px; border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); text-align: center;
+        border: 1px solid #374151; margin-bottom: 15px;
     }
-    .feature-card h3 {
-        color: #60A5FA; /* Light Blue Text */
-        font-size: 18px;
-        margin-bottom: 5px;
-    }
-    .feature-card p {
-        color: #9CA3AF; /* Grey Text */
-        font-size: 14px;
-    }
+    .feature-card h3 { color: #60A5FA; font-size: 18px; margin-bottom: 5px; }
+    .feature-card p { color: #9CA3AF; font-size: 14px; }
     
-    /* 4. BUTTONS (Neon Blue) */
+    /* Buttons */
     .stButton>button {
-        background-color: #2563EB;
-        color: white;
-        border-radius: 8px;
-        font-weight: 600;
-        width: 100%;
-        border: none;
-        padding: 12px;
+        background-color: #2563EB; color: white; border-radius: 8px;
+        font-weight: 600; width: 100%; border: none; padding: 12px;
     }
-    .stButton>button:hover {
-        background-color: #1D4ED8;
-    }
+    .stButton>button:hover { background-color: #1D4ED8; }
 
-    /* 5. SPLASH SCREEN (Dark) */
+    /* Splash Screen */
     .splash-title {
         font-size: 60px !important; font-weight: 900; color: #60A5FA; 
         text-align: center; text-shadow: 0px 0px 10px rgba(37, 99, 235, 0.5);
@@ -98,20 +67,14 @@ st.markdown("""
     .splash-subtitle { font-size: 20px; color: #D1D5DB; text-align: center; }
     .splash-credits { font-size: 14px; color: #6B7280; text-align: center; margin-top: 20px; }
 
-    /* 6. ADMIN & CHAT BUBBLES */
-    .lb-row {
-        background: #111827; padding: 12px; margin: 5px 0; border-radius: 8px;
-        border-left: 4px solid #2563EB; color: white;
-    }
-    .kuchu-bubble {
-        background-color: #1E3A8A; color: white; border-radius: 15px; padding: 15px;
-        border: 1px solid #2563EB; margin-top: 10px;
-    }
+    /* Admin & Chat */
+    .lb-row { background: #111827; padding: 12px; margin: 5px 0; border-radius: 8px; border-left: 4px solid #2563EB; color: white; }
+    .kuchu-bubble { background-color: #1E3A8A; color: white; border-radius: 15px; padding: 15px; border: 1px solid #2563EB; margin-top: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 💾 DATABASE FUNCTIONS
+# 💾 DATABASE FUNCTIONS (SPY MODE INCLUDED)
 # ==========================================
 def init_db():
     conn = sqlite3.connect('vchartered_db.db')
@@ -123,12 +86,14 @@ def init_db():
     conn.close()
 
 def log_activity(email, action, details=""):
-    conn = sqlite3.connect('vchartered_db.db')
-    c = conn.cursor()
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    c.execute("INSERT INTO activity_logs VALUES (?, ?, ?, ?)", (email, action, details, timestamp))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect('vchartered_db.db')
+        c = conn.cursor()
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        c.execute("INSERT INTO activity_logs VALUES (?, ?, ?, ?)", (email, action, details, timestamp))
+        conn.commit()
+        conn.close()
+    except: pass
 
 def create_user(email, username, password):
     conn = sqlite3.connect('vchartered_db.db')
@@ -162,114 +127,39 @@ def get_all_users():
     conn.close()
     return df
 
-def save_score(email, subject, score):
-    conn = sqlite3.connect('vchartered_db.db')
-    c = conn.cursor()
-    date = datetime.datetime.now().strftime("%Y-%m-%d")
-    c.execute("INSERT INTO results VALUES (?, ?, ?, ?)", (email, subject, score, date))
-    conn.commit()
-    conn.close()
-
 def get_leaderboard():
     conn = sqlite3.connect('vchartered_db.db')
     df = pd.read_sql_query("SELECT email, subject, score FROM results ORDER BY score DESC LIMIT 5", conn)
     conn.close()
     return df
 
-def get_user_history(email):
-    conn = sqlite3.connect('vchartered_db.db')
-    df = pd.read_sql_query(f"SELECT subject, score, date FROM results WHERE email='{email}'", conn)
-    conn.close()
-    return df
-
 init_db()
 
 # ==========================================
-# 🍪 LOGIN MANAGER (TOP PRIORITY)
+# 🔐 AUTHENTICATION (MERGED & FIXED 🛠️)
 # ==========================================
-# Isko sabse upar rakha hai taaki refresh hone par sabse pehle ye load ho
-# ==========================================
-# 🔐 LOGIN (REFRESH FIX WALA CODE 🛠️)
-# ==========================================
-# ==========================================
-# 🔐 LOGIN LOGIC (MOBILE FRIENDLY FIX 📱)
-# ==========================================
-# 1. Manager Initialize karo
-cookie_manager = stx.CookieManager(key="mobile_auth_fix")
+cookie_manager = stx.CookieManager(key="auth_manager_final")
 
-# 2. Initialization (Agar variables nahi hain toh banao)
+# Init Session
 if 'user_name' not in st.session_state: st.session_state['user_name'] = None
 if 'user_email' not in st.session_state: st.session_state['user_email'] = None
 if 'current_page' not in st.session_state: st.session_state['current_page'] = "Home"
 
-# 3. CRITICAL: Cookies Padhne ki Koshish
-# Mobile par kabhi-kabhi time lagta hai, isliye hum check karte rahenge
+# 1. Check Cookies
 cookie_email = cookie_manager.get(cookie='v_email')
 cookie_user = cookie_manager.get(cookie='v_user')
 
-# 4. SYNCHRONIZATION LOGIC (Jadoo Yahan Hai ✨)
-# Agar Session khali hai, LEKIN Cookie mil gayi -> Toh turant Session bharo aur Rerun karo
+# 2. Auto-Login Logic (Mobile Fix)
 if not st.session_state['user_email'] and cookie_email:
     st.session_state['user_email'] = cookie_email
     st.session_state['user_name'] = cookie_user
-    
-    # Optional: Log kar lo
-    try:
-        log_activity(cookie_email, "Auto-Login", "Mobile/Refresh Restore")
-    except:
-        pass
-        
-    # Code ko yahi roko aur page reload karo taaki Login Form gayab ho jaye
+    log_activity(cookie_email, "Auto-Login", "Restored Session")
     st.rerun()
 
-# 5. LOGIN FORM (Ye tabhi dikhega jab Cookie bhi nahi hai aur Session bhi nahi)
+# 3. LOGIN PAGE (Show only if NOT logged in)
 if not st.session_state['user_email']:
-    # Mobile ke liye thoda sa delay (Safe side)
-    time.sleep(0.3)
     
-    # Dubara check (Just in case 0.3 sec mein cookie aa gayi ho)
-    if cookie_manager.get(cookie='v_email'):
-        st.rerun()
-
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown("<br><h2 style='text-align:center; color:#004B87;'>Login Required</h2>", unsafe_allow_html=True)
-        tab1, tab2 = st.tabs(["🔐 Login", "📝 Sign Up"])
-        
-        with tab1:
-            email = st.text_input("Email ID")
-            password = st.text_input("Password", type="password")
-            if st.button("Login Securely"):
-                user = check_login(email, password)
-                if user:
-                    # Cookie Set karo (30 Din ke liye)
-                    cookie_manager.set('v_email', email, expires_at=datetime.datetime.now() + datetime.timedelta(days=30), key="set_e")
-                    cookie_manager.set('v_user', user, expires_at=datetime.datetime.now() + datetime.timedelta(days=30), key="set_u")
-                    
-                    # Session Update
-                    st.session_state['user_email'] = email
-                    st.session_state['user_name'] = user
-                    
-                    try: log_activity(email, "Login", "Success") 
-                    except: pass
-                    
-                    st.rerun()
-                else: st.error("Invalid Credentials")
-        
-        with tab2:
-            new_email = st.text_input("Enter Gmail")
-            new_name = st.text_input("Full Name")
-            new_pass = st.text_input("Set Password", type="password")
-            if st.button("Create Account"):
-                if create_user(new_email, new_name, new_pass): st.success("Created! Please Login.");
-                else: st.error("Email already registered.")
-    st.stop() # Yahan code ruk jayega agar login nahi hua
-
-# ==========================================
-# 🔐 LOGIN SCREEN (DARK MODE)
-# ==========================================
-if not st.session_state['user_email']:
-    # SPLASH SCREEN (Only on Login Page)
+    # SPLASH SCREEN (Only once)
     if 'splash_shown' not in st.session_state:
         placeholder = st.empty()
         with placeholder.container():
@@ -281,9 +171,14 @@ if not st.session_state['user_email']:
         placeholder.empty()
         st.session_state['splash_shown'] = True
 
+    # Login Form
     col1, col2, col3 = st.columns([1, 6, 1])
     with col2:
         st.markdown("<h3 style='text-align:center; color:#60A5FA;'>Login Required</h3>", unsafe_allow_html=True)
+        
+        # Reload Button for Mobile Glitches
+        if st.button("🔄 Reload Page (If Stuck)"): st.rerun()
+
         tab1, tab2 = st.tabs(["🔐 Login", "📝 Sign Up"])
         
         with tab1:
@@ -292,7 +187,7 @@ if not st.session_state['user_email']:
             if st.button("Login Securely"):
                 user = check_login(email, password)
                 if user:
-                    # Cookies Set with 30 Days Expiry
+                    # Set Cookies (30 Days)
                     expires = datetime.datetime.now() + datetime.timedelta(days=30)
                     cookie_manager.set('v_email', email, expires_at=expires, key="s_e")
                     cookie_manager.set('v_user', user, expires_at=expires, key="s_u")
@@ -300,11 +195,10 @@ if not st.session_state['user_email']:
                     st.session_state['user_email'] = email
                     st.session_state['user_name'] = user
                     log_activity(email, "Login", "Success")
-                    time.sleep(0.5) # Thoda wait taaki cookie set ho jaye
                     st.rerun()
                 else:
                     st.error("Invalid Credentials")
-                    
+        
         with tab2:
             new_email = st.text_input("Gmail ID")
             new_name = st.text_input("Full Name")
@@ -314,31 +208,31 @@ if not st.session_state['user_email']:
                     st.success("Account Created! Login now.")
                     log_activity(new_email, "Sign Up", "New User")
                 else: st.error("Email already registered.")
-    st.stop()
+    
+    st.stop() # Stop here if not logged in
 
 # ==========================================
-# 🕵️‍♂️ ADMIN LOGIC (MISSING THA, AB WAPAS HAI)
+# 🕵️‍♂️ ADMIN CHECK
 # ==========================================
-# Check agar email mein 'admin' ya 'atishay' hai
 IS_ADMIN = "admin" in st.session_state['user_email'].lower() or "atishay" in st.session_state['user_email'].lower()
 
 # ==========================================
-# 📊 SIDEBAR (DARK MODE)
+# 📊 SIDEBAR
 # ==========================================
 with st.sidebar:
     st.markdown(f"### 👤 {st.session_state['user_name']}")
     
     if st.button("Logout"):
-        try: log_activity(st.session_state['user_email'], "Logout", "User Clicked"); 
-        except: pass
+        log_activity(st.session_state['user_email'], "Logout", "Clicked")
         try: cookie_manager.delete('v_email', key="d_e"); 
         except: pass
         try: cookie_manager.delete('v_user', key="d_u"); 
         except: pass
         st.session_state['user_email'] = None
+        st.session_state['user_name'] = None
         st.rerun()
 
-    # 👇 YE BUTTON SIRF ADMIN KO DIKHEGA 👇
+    # Admin Button
     if IS_ADMIN:
         st.markdown("---")
         st.markdown("### 🕵️‍♂️ Admin Panel")
@@ -358,7 +252,7 @@ with st.sidebar:
         st.rerun()
 
 # ==========================================
-# 🏠 HOME PAGE (APP GRID LAYOUT)
+# 🏠 HOME PAGE
 # ==========================================
 if st.session_state['current_page'] == "Home":
     st.title("Dashboard")
@@ -381,7 +275,7 @@ if st.session_state['current_page'] == "Home":
         if st.button("Open Library"): st.session_state['current_page'] = "Library"; log_activity(st.session_state['user_email'], "Visited", "Library"); st.rerun()
 
 # ==========================================
-# 🕵️‍♂️ PAGE: ADMIN PANEL (JASOOSI)
+# 🕵️‍♂️ PAGE: ADMIN PANEL
 # ==========================================
 elif st.session_state['current_page'] == "AdminPanel" and IS_ADMIN:
     st.title("🕵️‍♂️ Admin Tracker")
@@ -389,9 +283,9 @@ elif st.session_state['current_page'] == "AdminPanel" and IS_ADMIN:
     
     with tab1:
         st.write("Live User Activity:")
+        if st.button("Refresh Logs"): st.rerun()
         logs = get_logs()
         st.dataframe(logs, use_container_width=True)
-        if st.button("Refresh Data"): st.rerun()
         
     with tab2:
         users = get_all_users()
