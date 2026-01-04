@@ -35,19 +35,77 @@ CA_FINAL_SUBJECTS = ["Financial Reporting (FR)", "Advanced Financial Management 
 CA_INTER_SUBJECTS = ["Advanced Accounting", "Corporate Laws", "Taxation", "Costing", "Auditing", "FM-SM"]
 
 # ==========================================
-# 🎨 CUSTOM CSS
+# 🎨 DYNAMIC THEME CSS (FIXED VISIBILITY)
 # ==========================================
-st.markdown("""
+# 1. Default Theme Set Karo
+if 'theme' not in st.session_state: st.session_state['theme'] = 'light'
+
+# 2. Colors Decide Karo (Dark vs Light)
+if st.session_state['theme'] == 'dark':
+    # 🌑 DARK MODE COLORS
+    bg_color = "#0E1117"       # Black Background
+    card_bg = "#1E1E1E"        # Dark Gray Cards
+    text_color = "white"       # White Text
+    title_color = "#90CAF9"    # Light Blue Headings
+    border_color = "#333"
+else:
+    # ☀️ LIGHT MODE COLORS
+    bg_color = "#F0F4F8"       # White-Blue Background
+    card_bg = "white"          # White Cards
+    text_color = "#0d1b2a"     # Dark Black-Blue Text
+    title_color = "#004B87"    # Deep Blue Headings
+    border_color = "#E1E8ED"
+
+# 3. CSS Inject Karo
+st.markdown(f"""
 <style>
-    .stApp { background-color: #F0F4F8; }
-    .feature-card {
-        background-color: white; padding: 25px; border-radius: 15px;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.08); text-align: center;
-        border: 1px solid #E1E8ED; margin-bottom: 20px; transition: transform 0.2s;
-    }
-    .feature-card:hover { transform: translateY(-5px); border-color: #004B87; }
-    .stButton>button { background-color: #004B87; color: white; border-radius: 8px; font-weight: 600; width: 100%; border: none; padding: 12px; }
-    .splash-title { font-size: 60px; color: #004B87; text-align: center; font-weight: bold; }
+    /* Main Background */
+    .stApp {{ background-color: {bg_color}; }}
+    
+    /* 🔴 SABSE ZAROORI: Text Color Control */
+    h1, h2, h3, h4, h5, p, span, div, label, li {{
+        color: {text_color} !important;
+    }}
+    
+    /* Feature Cards Design */
+    .feature-card {{
+        background-color: {card_bg}; 
+        padding: 25px; 
+        border-radius: 15px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1); 
+        text-align: center;
+        border: 1px solid {border_color}; 
+        margin-bottom: 20px; 
+        transition: transform 0.2s;
+    }}
+    .feature-card:hover {{ transform: translateY(-5px); border-color: {title_color}; }}
+    
+    /* Headings inside Cards */
+    .feature-card h3 {{ color: {title_color} !important; }}
+    
+    /* Buttons */
+    .stButton>button {{ 
+        background-color: #004B87 !important; 
+        color: white !important; 
+        border-radius: 8px; 
+        font-weight: 600; 
+        width: 100%; 
+        border: none; 
+        padding: 12px; 
+    }}
+    
+    /* Input Fields Text (Always Black for visibility) */
+    .stTextInput input, .stSelectbox div, .stTextArea textarea {{ 
+        color: {text_color} !important; 
+    }}
+    
+    /* Splash Screen Font */
+    .splash-title {{ 
+        font-size: 60px; 
+        color: {title_color} !important; 
+        text-align: center; 
+        font-weight: bold; 
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -130,6 +188,22 @@ def save_score(email, subject, score):
 init_db()
 
 # ==========================================
+# ✨ ANIMATED SPLASH SCREEN (ADDED BACK)
+# ==========================================
+if 'splash_shown' not in st.session_state:
+    placeholder = st.empty()
+    with placeholder.container():
+        st.markdown(f"<br><br><br><div class='splash-title'>V-Chartered</div>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align:center; color:grey;'>Made by Atishay Jain & Google Gemini</p>", unsafe_allow_html=True)
+        bar = st.progress(0)
+        for i in range(100):
+            time.sleep(0.01)
+            bar.progress(i + 1)
+        time.sleep(0.5)
+    placeholder.empty()
+    st.session_state['splash_shown'] = True
+
+# ==========================================
 # 🔐 MAGIC URL AUTHENTICATION (NO COOKIES)
 # ==========================================
 if 'user_email' not in st.session_state: st.session_state['user_email'] = None
@@ -154,7 +228,7 @@ if "uid" in query_params:
 
 # 2. LOGIN FORM (Sirf tab jab Session bhi nahi aur URL bhi nahi)
 if not st.session_state['user_email']:
-    # Splash Screen Sirf Login Page par
+    # Splash Screen Sirf Login Page par (Static)
     st.markdown("<br><br><div class='splash-title'>V-Chartered</div>", unsafe_allow_html=True)
     st.markdown("<p style='text-align:center; color:grey;'>Made by Atishay Jain & Google Gemini</p>", unsafe_allow_html=True)
     
@@ -198,6 +272,14 @@ IS_ADMIN = "admin" in st.session_state['user_email'].lower() or "atishay" in st.
 # ==========================================
 with st.sidebar:
     st.title(f"👤 {st.session_state['user_name']}")
+    
+    # --- THEME BUTTON (ADDED HERE) ---
+    if st.button("🌗 Change Theme"):
+        if st.session_state['theme'] == 'light':
+            st.session_state['theme'] = 'dark'
+        else:
+            st.session_state['theme'] = 'light'
+        st.rerun()
     
     if st.button("Logout"):
         log_activity(st.session_state['user_email'], "Logout", "Clicked")
