@@ -13,7 +13,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown('<p class="big-font">CA Exam & Audit Expert (AI)</p>', unsafe_allow_html=True)
-st.write("Specialized for Vanshika's CA Final Preparation")
+st.write("Specialized for Vanshika's CA Final Preparation (Powered by Gemini 2.5)")
 
 # --- SIDEBAR (API KEY) ---
 with st.sidebar:
@@ -29,8 +29,9 @@ def get_gemini_response(input_prompt, image=None):
         return "Please enter the API Key in the sidebar first."
     
     genai.configure(api_key=api_key)
-    # Use Flash model for speed
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    
+    # --- UPDATED: STRICTLY USING GEMINI 2.5 FLASH ---
+    model = genai.GenerativeModel('gemini-2.5-flash')
     
     try:
         if image:
@@ -51,7 +52,7 @@ if mode == "📝 Answer Checker (Image)":
         st.image(image, caption="Uploaded Answer", use_column_width=True)
         
         if st.button("Check as ICAI Examiner"):
-            with st.spinner("Analyzing handwriting and logic..."):
+            with st.spinner("Analyzing handwriting with Gemini 2.5..."):
                 prompt = """
                 Act as a strict Examiner for the Institute of Chartered Accountants of India (ICAI). 
                 The user has uploaded a handwritten answer for a CA Final/Inter level question.
@@ -73,7 +74,7 @@ elif mode == "🧠 Generate Quiz":
     level = st.selectbox("Level", ["CA Inter", "CA Final"])
     
     if st.button("Generate 20 Questions"):
-        with st.spinner(f"Creating {level} level questions..."):
+        with st.spinner(f"Creating {level} level questions using Gemini 2.5..."):
             prompt = f"""
             Create a tough mock test of 20 Multiple Choice Questions (MCQs) for {level} students.
             Topic: {topic}.
