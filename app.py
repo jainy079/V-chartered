@@ -216,10 +216,27 @@ with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", width=60)
     st.markdown(f"### Hi, {st.session_state['user_name']}")
     
-    if st.button("Logout"):
-        cookie_manager.delete('v_email', key="del_e")
-        cookie_manager.delete('v_user', key="del_u")
+   if st.button("Logout"):
+        # 1. Activity Log (Agar tracking on hai)
+        try:
+            log_activity(st.session_state['user_email'], "Logout", "User Clicked")
+        except:
+            pass # Agar spy mode nahi hai toh ignore karega
+        
+        # 2. Cookies Delete (Safe Mode - Crash nahi hoga)
+        try:
+            cookie_manager.delete('v_email', key="safe_logout_email")
+        except:
+            pass
+            
+        try:
+            cookie_manager.delete('v_user', key="safe_logout_user")
+        except:
+            pass
+            
+        # 3. Session Clear
         st.session_state['user_email'] = None
+        st.session_state['user_name'] = None
         st.rerun()
         
     st.markdown("---")
