@@ -10,18 +10,19 @@ import extra_streamlit_components as stx
 import datetime
 
 # ==========================================
-# 🛡️ SECURE SETUP (SECRET KEY)
+# 🛡️ SECURE SETUP (Sirf ye hissa badalna hai)
 # ==========================================
-# Ab hum key yahan nahi likhenge. Streamlit Cloud ke "Secrets" se uthayenge.
 try:
+    # Hum check karenge ki kya Key "Secrets" mein hai?
     if "GOOGLE_API_KEY" in st.secrets:
         genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
         model = genai.GenerativeModel('gemini-2.5-flash')
     else:
-        st.error("🚨 API Key Missing! Please add it to Streamlit Secrets.")
+        # Agar key nahi mili toh ye error dikhega
+        st.error("🚨 Error: API Key nahi mili! Streamlit Secrets check karo.")
         st.stop()
 except Exception as e:
-    st.error(f"Setup Error: {e}")
+    st.error(f"Connection Error: {e}")
 
 # --- PAGE CONFIG ---
 st.set_page_config(
