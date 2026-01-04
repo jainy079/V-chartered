@@ -4,107 +4,93 @@ from PIL import Image
 import time
 import sqlite3
 import hashlib
+import pandas as pd
+import extra_streamlit_components as stx # pip install extra-streamlit-components
+import datetime
 
 # ==========================================
-# 👇 CONFIGURATION 👇
+# 👇 SETUP & CONFIGURATION 👇
 # ==========================================
-# ✅ YE LIKHO (Ye Streamlit ke secret box se key uthayega)
-import streamlit as st # Ensure ye import hai
-
-# Secret key fetch karo
-api_key = st.secrets["GOOGLE_API_KEY"] 
-genai.configure(api_key=api_key)
-
-# Note: Gemini 1.5 Flash use karo, wo Free tier par kabhi block nahi hota
+GOOGLE_API_KEY = "AIzaSyCwjIu4Hc4HczJUeZdfVgw1j1VxWPZq-JM"
+genai.configure(api_key=GOOGLE_API_KEY)
 model = genai.GenerativeModel('gemini-2.5-flash')
 
 st.set_page_config(
     page_title="V-Chartered",
     page_icon="🎓",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
+# --- SUBJECT LISTS (NEW SCHEME) ---
+CA_FINAL_SUBJECTS = [
+    "Financial Reporting (FR)",
+    "Advanced Financial Management (AFM)",
+    "Advanced Auditing, Assurance & Ethics",
+    "Direct Tax Laws & International Taxation",
+    "Indirect Tax Laws (GST)",
+    "Integrated Business Solutions (IBS)"
+]
+
+CA_INTER_SUBJECTS = [
+    "Advanced Accounting",
+    "Corporate & Other Laws",
+    "Taxation (DT & IDT)",
+    "Cost and Management Accounting",
+    "Auditing and Ethics",
+    "Financial Management & Strategic Management (FM-SM)"
+]
+
 # ==========================================
-# 🎨 CUSTOM CSS (Startup Look & Mobile Friendly)
+# 🎨 CUSTOM CSS
 # ==========================================
 st.markdown("""
 <style>
-    /* Mobile Friendly Fonts */
-    html, body, [class*="css"] {
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-    
-    /* Card Styling */
+    .stApp { background-color: #f8f9fa; }
     .feature-card {
         background-color: white;
         padding: 20px;
         border-radius: 12px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         text-align: center;
         border: 1px solid #e0e0e0;
         margin-bottom: 20px;
         transition: transform 0.2s;
     }
-    .feature-card:hover {
-        transform: scale(1.02);
-        border-color: #004B87;
-    }
-    
-    /* Splash Screen Text */
-    .credits {
-        font-size: 14px;
-        color: #666;
-        margin-top: 10px;
-        font-style: italic;
-    }
-
-    /* ICAI Blue Theme Buttons */
+    .feature-card:hover { transform: scale(1.02); border-color: #004B87; }
     .stButton>button {
         background-color: #004B87;
         color: white;
-        border-radius: 8px;
-        width: 100%;
         font-weight: 600;
-    }
-    
-    /* Kuchu Box */
-    .kuchu-msg {
-        background-color: #E3F2FD;
-        border-left: 5px solid #2196F3;
-        padding: 15px;
-        border-radius: 5px;
-        margin-top: 10px;
+        border-radius: 8px;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 💾 DATABASE HANDLING (Sign Up/Login)
+# 💾 DATABASE & AUTH FUNCTIONS
 # ==========================================
 def init_db():
-    conn = sqlite3.connect('vchartered_users.db')
+    conn = sqlite3.connect('vchartered_db.db')
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS users 
-                 (email TEXT PRIMARY KEY, username TEXT, password TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS users (email TEXT PRIMARY KEY, username TEXT, password TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS results (email TEXT, subject TEXT, score INTEGER, date TEXT)''')
     conn.commit()
     conn.close()
 
 def create_user(email, username, password):
-    conn = sqlite3.connect('vchartered_users.db')
+    conn = sqlite3.connect('vchartered_db.db')
     c = conn.cursor()
     hashed_pw = hashlib.sha256(password.encode()).hexdigest()
     try:
         c.execute("INSERT INTO users VALUES (?, ?, ?)", (email, username, hashed_pw))
         conn.commit()
         return True
-    except sqlite3.IntegrityError:
-        return False
-    finally:
-        conn.close()
+    except: return False
+    finally: conn.close()
 
 def check_login(email, password):
-    conn = sqlite3.connect('vchartered_users.db')
+    conn = sqlite3.connect('vchartered_db.db')
     c = conn.cursor()
     hashed_pw = hashlib.sha256(password.encode()).hexdigest()
     c.execute("SELECT username FROM users WHERE email=? AND password=?", (email, hashed_pw))
@@ -112,226 +98,185 @@ def check_login(email, password):
     conn.close()
     return result[0] if result else None
 
-# Initialize DB on load
+def save_score(email, subject, score):
+    conn = sqlite3.connect('vchartered_db.db')
+    c = conn.cursor()
+    date = datetime.datetime.now().strftime("%Y-%m-%d")
+    c.execute("INSERT INTO results VALUES (?, ?, ?, ?)", (email, subject, score, date))
+    conn.commit()
+    conn.close()
+
+def get_leaderboard():
+    conn = sqlite3.connect('vchartered_db.db')
+    df = pd.read_sql_query("SELECT email, subject, score FROM results ORDER BY score DESC LIMIT 5", conn)
+    conn.close()
+    return df
+
+def get_user_history(email):
+    conn = sqlite3.connect('vchartered_db.db')
+    df = pd.read_sql_query(f"SELECT subject, score, date FROM results WHERE email='{email}' ORDER BY rowid DESC LIMIT 5", conn)
+    conn.close()
+    return df
+
 init_db()
 
 # ==========================================
-# 🌊 STATE MANAGEMENT
+# 🍪 LOGIN COOKIE MANAGER
 # ==========================================
-if 'logged_in' not in st.session_state: st.session_state['logged_in'] = False
-if 'user_name' not in st.session_state: st.session_state['user_name'] = ""
-if 'current_page' not in st.session_state: st.session_state['current_page'] = "Login"
-if 'generated_questions' not in st.session_state: st.session_state['generated_questions'] = None
+cookie_manager = stx.CookieManager()
+if 'user_name' not in st.session_state: st.session_state['user_name'] = None
+if 'user_email' not in st.session_state: st.session_state['user_email'] = None
+if 'current_page' not in st.session_state: st.session_state['current_page'] = "Home"
+
+cookie_user = cookie_manager.get(cookie='v_user_email')
+cookie_name = cookie_manager.get(cookie='v_user_name')
+
+if cookie_user and not st.session_state['user_email']:
+    st.session_state['user_email'] = cookie_user
+    st.session_state['user_name'] = cookie_name
 
 # ==========================================
-# 1️⃣ SPLASH SCREEN
+# 🔐 AUTH PAGE
 # ==========================================
-if 'splash_shown' not in st.session_state:
-    placeholder = st.empty()
-    with placeholder.container():
-        st.markdown("<br><br><br>", unsafe_allow_html=True)
-        st.markdown("<h1 style='text-align: center; color: #004B87; font-size: 60px;'>V-Chartered</h1>", unsafe_allow_html=True)
-        st.markdown("<h3 style='text-align: center; color: #333;'>Redefining CA Preparation</h3>", unsafe_allow_html=True)
-        
-        # CREDITS (Tera Naam)
-        st.markdown("<p style='text-align: center;' class='credits'>Made by <b>Atishay Jain</b> & <b>Google Gemini Services</b></p>", unsafe_allow_html=True)
-        
-        bar = st.progress(0)
-        for i in range(100):
-            time.sleep(0.015)
-            bar.progress(i + 1)
-        time.sleep(1)
-    placeholder.empty()
-    st.session_state['splash_shown'] = True
-
-# ==========================================
-# 2️⃣ AUTHENTICATION (Login / Sign Up)
-# ==========================================
-if not st.session_state['logged_in']:
+if not st.session_state['user_email']:
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown("### Welcome to V-Chartered 🎓")
-        auth_mode = st.radio("Choose Option:", ["Login", "Sign Up"], horizontal=True)
-        
-        if auth_mode == "Sign Up":
-            with st.form("signup_form"):
-                new_email = st.text_input("Email ID (Gmail)")
-                new_user = st.text_input("Full Name")
-                new_pass = st.text_input("Create Password", type="password")
-                if st.form_submit_button("Register"):
-                    if new_email and new_user and new_pass:
-                        if create_user(new_email, new_user, new_pass):
-                            st.success("Account Created! Please Login.")
-                        else:
-                            st.error("Email already exists!")
-                    else:
-                        st.warning("All fields are required.")
-                        
-        else: # Login
-            with st.form("login_form"):
-                email = st.text_input("Email ID")
-                password = st.text_input("Password", type="password")
-                if st.form_submit_button("Login Securely"):
-                    user = check_login(email, password)
-                    if user:
-                        st.session_state['logged_in'] = True
-                        st.session_state['user_name'] = user
-                        st.session_state['current_page'] = "Home"
-                        st.rerun()
-                    else:
-                        st.error("Invalid Email or Password.")
+        st.markdown("<h1 style='text-align: center; color:#004B87;'>V-Chartered</h1>", unsafe_allow_html=True)
+        tab1, tab2 = st.tabs(["Login", "Sign Up"])
+        with tab1:
+            email = st.text_input("Email")
+            password = st.text_input("Password", type="password")
+            if st.button("Login"):
+                user = check_login(email, password)
+                if user:
+                    cookie_manager.set('v_user_email', email, expires_at=datetime.datetime.now() + datetime.timedelta(days=30))
+                    cookie_manager.set('v_user_name', user, expires_at=datetime.datetime.now() + datetime.timedelta(days=30))
+                    st.session_state['user_email'] = email
+                    st.session_state['user_name'] = user
+                    st.rerun()
+                else: st.error("Invalid Credentials")
+        with tab2:
+            new_email = st.text_input("New Email")
+            new_name = st.text_input("Full Name")
+            new_pass = st.text_input("New Password", type="password")
+            if st.button("Create Account"):
+                if create_user(new_email, new_name, new_pass): st.success("Created! Login now.")
+                else: st.error("Email exists.")
     st.stop()
 
 # ==========================================
-# 3️⃣ NAVIGATION HANDLER
+# 📊 SIDEBAR
 # ==========================================
-def go_home(): st.session_state['current_page'] = "Home"
-
-# Sidebar for Logout only
 with st.sidebar:
-    st.write(f"👤 **{st.session_state['user_name']}**")
+    st.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", width=70)
+    st.markdown(f"### 👤 {st.session_state['user_name']}")
     if st.button("Logout"):
-        st.session_state['logged_in'] = False
+        cookie_manager.delete('v_user_email')
+        cookie_manager.delete('v_user_name')
+        st.session_state['user_email'] = None
         st.rerun()
-    if st.session_state['current_page'] != "Home":
-        if st.button("🏠 Back to Home"):
-            go_home()
-            st.rerun()
+    st.markdown("---")
+    st.markdown("### 🏆 Leaderboard")
+    lb = get_leaderboard()
+    if not lb.empty:
+        for i, row in lb.iterrows():
+            st.markdown(f"🥇 **{row['score']}/5** - {row['email'].split('@')[0]} ({row['subject'][:4]}..)")
+    else: st.caption("No Data")
+    st.markdown("---")
+    if st.button("🏠 Home"): st.session_state['current_page'] = "Home"; st.rerun()
 
 # ==========================================
-# 4️⃣ HOME PAGE (ICONS DASHBOARD)
+# 🏠 HOME PAGE
 # ==========================================
 if st.session_state['current_page'] == "Home":
-    st.title(f"Hello, {st.session_state['user_name'].split()[0]} 👋")
-    st.write("What would you like to do today?")
-    st.markdown("---")
-    
-    c1, c2 = st.columns(2)
-    c3, c4 = st.columns(2)
-    
+    st.title(f"Dashboard 🚀")
+    c1, c2, c3 = st.columns(3)
     with c1:
-        st.markdown('<div class="feature-card"><h3>📑 Mock Test Series</h3><p>10 Questions Set (Inter/Final)</p></div>', unsafe_allow_html=True)
-        if st.button("Start Mock Test"):
-            st.session_state['current_page'] = "MockTest"
-            st.rerun()
-            
+        st.markdown('<div class="feature-card"><h3>📚 AI Notes</h3><p>Select Subject & Topic</p></div>', unsafe_allow_html=True)
+        if st.button("Open Library"): st.session_state['current_page'] = "Material"; st.rerun()
     with c2:
-        st.markdown('<div class="feature-card"><h3>📸 External Checker</h3><p>Upload any Q & A Photo</p></div>', unsafe_allow_html=True)
-        if st.button("Open Answer Scanner"):
-            st.session_state['current_page'] = "ExternalCheck"
-            st.rerun()
-            
+        st.markdown('<div class="feature-card"><h3>📑 Mock Test</h3><p>Real Exam Subjects</p></div>', unsafe_allow_html=True)
+        if st.button("Start Test"): st.session_state['current_page'] = "Test"; st.rerun()
     with c3:
-        st.markdown('<div class="feature-card"><h3>🤖 Ask Kuchu</h3><p>Doubts + Motivation</p></div>', unsafe_allow_html=True)
-        if st.button("Talk to Kuchu"):
-            st.session_state['current_page'] = "Kuchu"
-            st.rerun()
-
-    with c4:
-        st.markdown('<div class="feature-card"><h3>📚 Study Material</h3><p>Subject-wise Notes (Coming Soon)</p></div>', unsafe_allow_html=True)
-        st.button("Access Library") # Placeholder
+        st.markdown('<div class="feature-card"><h3>📸 Checker</h3><p>Upload Answer Sheet</p></div>', unsafe_allow_html=True)
+        if st.button("Check Answers"): st.session_state['current_page'] = "Checker"; st.rerun()
 
 # ==========================================
-# 5️⃣ FEATURE: MOCK TEST (10 Q SET)
+# 📚 PAGE: AI STUDY MATERIAL (SMART SEARCH)
 # ==========================================
-elif st.session_state['current_page'] == "MockTest":
-    st.title("📑 CA Exam Simulator")
+elif st.session_state['current_page'] == "Material":
+    st.title("📚 Smart Library")
     
-    # Selection Phase
-    if st.session_state['generated_questions'] is None:
-        col1, col2 = st.columns(2)
-        with col1:
-            level = st.selectbox("Select Level", ["CA Foundation", "CA Inter", "CA Final"])
-        with col2:
-            subject = st.text_input("Enter Subject (e.g., Audit, Law)")
-            
-        if st.button("Generate 10 Questions Set"):
-            with st.spinner("Preparing Question Paper..."):
-                prompt = f"""
-                Create a QUESTION PAPER of 10 Tough Questions for {level} - {subject}.
-                Mix of Case Studies and Descriptive.
-                Format:
-                Q1. [Question] (Marks: 5)
-                ...
-                Q10. [Question] (Marks: 5)
-                Do NOT include answers.
-                """
-                response = model.generate_content(prompt)
-                st.session_state['generated_questions'] = response.text
-                st.rerun()
-                
-    # Exam Phase
+    # LEVEL SELECTOR
+    level = st.radio("Select Level:", ["CA Final", "CA Inter"], horizontal=True)
+    
+    # SMART SUBJECT DROPDOWN (Google Style)
+    if level == "CA Final":
+        subject = st.selectbox("Search Subject:", CA_FINAL_SUBJECTS)
     else:
-        st.markdown("### 📝 Question Paper")
-        with st.expander("Click to View Questions", expanded=True):
-            st.markdown(st.session_state['generated_questions'])
+        subject = st.selectbox("Search Subject:", CA_INTER_SUBJECTS)
         
-        st.markdown("---")
-        st.markdown("### 📤 Submit Answer Sheet")
-        st.info("Write answers on paper, click photos, and upload here. You can submit early.")
-        
-        uploaded_files = st.file_uploader("Upload Answer Sheets (Images)", type=['jpg', 'png', 'jpeg'], accept_multiple_files=True)
-        
-        if uploaded_files and st.button("Submit & Evaluate Now"):
-            with st.spinner("Strict ICAI Checking in progress..."):
-                images = [Image.open(file) for file in uploaded_files]
-                
-                # Logic: Send Questions + All Images to Gemini
-                prompt = [f"Here is the Question Paper: {st.session_state['generated_questions']}. \n\n CHECK these answer sheets STRICTLY as per ICAI standards. For each question attempted, give marks and remarks.", *images]
-                
-                response = model.generate_content(prompt)
-                
-                st.markdown("## 📊 Result & Analysis")
-                st.markdown(response.text)
-                
-        if st.button("Reset / New Test"):
-            st.session_state['generated_questions'] = None
-            st.rerun()
-
-# ==========================================
-# 6️⃣ FEATURE: EXTERNAL CHECKER (Q + A Upload)
-# ==========================================
-elif st.session_state['current_page'] == "ExternalCheck":
-    st.title("📸 External Answer Analysis")
-    st.write("Check answers for questions from ANY source (Books, RTP, MTP).")
+    topic = st.text_input("Enter Topic Name (e.g. Forex, GST Audit)")
     
-    col1, col2 = st.columns(2)
-    with col1:
-        q_img = st.file_uploader("Upload Question Image", type=['jpg', 'png'])
-    with col2:
-        a_img = st.file_uploader("Upload Your Answer Image", type=['jpg', 'png'])
-        
-    if q_img and a_img:
-        if st.button("Analyze My Answer"):
-            with st.spinner("Analyzing..."):
-                img1 = Image.open(q_img)
-                img2 = Image.open(a_img)
-                
-                prompt = ["Read this Question image and Check this Answer image strictly. Give marks out of 5 and improve the answer.", img1, img2]
+    if st.button("Generate Notes"):
+        if topic:
+            with st.spinner(f"Creating notes for {subject} - {topic}..."):
+                prompt = f"Create Revision Notes for {level} Subject: {subject}, Topic: {topic}. Include Sections, Case Laws, and Key Points."
                 response = model.generate_content(prompt)
                 st.markdown(response.text)
 
 # ==========================================
-# 7️⃣ FEATURE: ASK KUCHU (Emotional Support)
+# 📑 PAGE: MOCK TEST (SMART SEARCH)
 # ==========================================
-elif st.session_state['current_page'] == "Kuchu":
-    st.title("🤖 Chat with Kuchu (CA Assistant)")
+elif st.session_state['current_page'] == "Test":
+    st.title("📝 Exam Simulator")
     
-    user_input = st.text_input("Ask a doubt or share your stress...")
-    
-    if st.button("Send"):
-        with st.spinner("Kuchu is thinking..."):
-            prompt = f"""
-            You are 'Kuchu', a supportive CA Senior.
-            User Input: {user_input}
+    # LEVEL & SUBJECT LOGIC
+    c1, c2 = st.columns(2)
+    with c1:
+        level = st.selectbox("Level", ["CA Final", "CA Inter"])
+    with c2:
+        if level == "CA Final":
+            subject = st.selectbox("Select Subject", CA_FINAL_SUBJECTS)
+        else:
+            subject = st.selectbox("Select Subject", CA_INTER_SUBJECTS)
             
-            Task:
-            1. If it's a technical doubt, explain it simply with an example.
-            2. If the user seems stressed/tired, be EMOTIONAL and MOTIVATING. Tell them "You can do it!".
-            3. Keep the tone friendly but professional.
-            """
-            response = model.generate_content(prompt)
+    if 'quiz_data' not in st.session_state:
+        if st.button("Generate Question"):
+            with st.spinner(f"Generating {subject} Question..."):
+                prompt = f"Create 1 Tough Practical MCQ for {level} - {subject}. Do NOT reveal answer."
+                res = model.generate_content(prompt)
+                st.session_state['quiz_data'] = res.text
+                st.rerun()
+    else:
+        st.markdown(f"**Subject:** {subject}")
+        st.info(st.session_state['quiz_data'])
+        ans = st.radio("Your Answer:", ["A", "B", "C", "D"])
+        
+        if st.button("Submit"):
+            chk_prompt = f"Question: {st.session_state['quiz_data']}. User Answer: {ans}. Correct? Give 5 marks if yes, else 0."
+            res = model.generate_content(chk_prompt)
+            st.write(res.text)
             
-            st.markdown('<div class="kuchu-msg">', unsafe_allow_html=True)
-            st.markdown(f"**Kuchu:** {response.text}")
-            st.markdown('</div>', unsafe_allow_html=True)
+            # Extract Score & Save
+            if "5" in res.text:
+                save_score(st.session_state['user_email'], subject, 5)
+                st.success("Correct! +5 added to Leaderboard.")
+            else:
+                save_score(st.session_state['user_email'], subject, 0)
+                st.error("Incorrect.")
+            
+            del st.session_state['quiz_data']
+            if st.button("Next"): st.rerun()
+
+# ==========================================
+# 📸 PAGE: CHECKER
+# ==========================================
+elif st.session_state['current_page'] == "Checker":
+    st.title("📸 Answer Checker")
+    f = st.file_uploader("Upload Image")
+    if f and st.button("Check"):
+        with st.spinner("Checking..."):
+            img = Image.open(f)
+            res = model.generate_content(["Check this CA Answer strictly. Give Marks.", img])
+            st.markdown(res.text)
