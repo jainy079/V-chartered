@@ -191,29 +191,79 @@ init_db()
 # ==========================================
 # 🔐 LOGIN (REFRESH FIX WALA CODE 🛠️)
 # ==========================================
-cookie_manager = stx.CookieManager(key="spy_auth")
+# ==========================================
+# 🔐 LOGIN LOGIC (MOBILE FRIENDLY FIX 📱)
+# ==========================================
+# 1. Manager Initialize karo
+cookie_manager = stx.CookieManager(key="mobile_auth_fix")
 
-# 👇 YE HAI MAGIC LINE (Refresh problem ka ilaaj)
-# Hum code ko aadha second rok rahe hain taaki browser cookie padh sake
-time.sleep(0.5)
-
+# 2. Initialization (Agar variables nahi hain toh banao)
 if 'user_name' not in st.session_state: st.session_state['user_name'] = None
 if 'user_email' not in st.session_state: st.session_state['user_email'] = None
 if 'current_page' not in st.session_state: st.session_state['current_page'] = "Home"
 
-# Cookie Auto-Login
+# 3. CRITICAL: Cookies Padhne ki Koshish
+# Mobile par kabhi-kabhi time lagta hai, isliye hum check karte rahenge
 cookie_email = cookie_manager.get(cookie='v_email')
 cookie_user = cookie_manager.get(cookie='v_user')
 
-# Agar cookie mili, toh Session mein daal do (Login Bypass)
-if cookie_email and not st.session_state['user_email']:
+# 4. SYNCHRONIZATION LOGIC (Jadoo Yahan Hai ✨)
+# Agar Session khali hai, LEKIN Cookie mil gayi -> Toh turant Session bharo aur Rerun karo
+if not st.session_state['user_email'] and cookie_email:
     st.session_state['user_email'] = cookie_email
     st.session_state['user_name'] = cookie_user
+    
+    # Optional: Log kar lo
     try:
-        log_activity(cookie_email, "Auto-Login", "Refreshed Page")
+        log_activity(cookie_email, "Auto-Login", "Mobile/Refresh Restore")
     except:
         pass
-    st.rerun() # Page ko reload karo taaki login dikh jaye
+        
+    # Code ko yahi roko aur page reload karo taaki Login Form gayab ho jaye
+    st.rerun()
+
+# 5. LOGIN FORM (Ye tabhi dikhega jab Cookie bhi nahi hai aur Session bhi nahi)
+if not st.session_state['user_email']:
+    # Mobile ke liye thoda sa delay (Safe side)
+    time.sleep(0.3)
+    
+    # Dubara check (Just in case 0.3 sec mein cookie aa gayi ho)
+    if cookie_manager.get(cookie='v_email'):
+        st.rerun()
+
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("<br><h2 style='text-align:center; color:#004B87;'>Login Required</h2>", unsafe_allow_html=True)
+        tab1, tab2 = st.tabs(["🔐 Login", "📝 Sign Up"])
+        
+        with tab1:
+            email = st.text_input("Email ID")
+            password = st.text_input("Password", type="password")
+            if st.button("Login Securely"):
+                user = check_login(email, password)
+                if user:
+                    # Cookie Set karo (30 Din ke liye)
+                    cookie_manager.set('v_email', email, expires_at=datetime.datetime.now() + datetime.timedelta(days=30), key="set_e")
+                    cookie_manager.set('v_user', user, expires_at=datetime.datetime.now() + datetime.timedelta(days=30), key="set_u")
+                    
+                    # Session Update
+                    st.session_state['user_email'] = email
+                    st.session_state['user_name'] = user
+                    
+                    try: log_activity(email, "Login", "Success") 
+                    except: pass
+                    
+                    st.rerun()
+                else: st.error("Invalid Credentials")
+        
+        with tab2:
+            new_email = st.text_input("Enter Gmail")
+            new_name = st.text_input("Full Name")
+            new_pass = st.text_input("Set Password", type="password")
+            if st.button("Create Account"):
+                if create_user(new_email, new_name, new_pass): st.success("Created! Please Login.");
+                else: st.error("Email already registered.")
+    st.stop() # Yahan code ruk jayega agar login nahi hua
 
 # ==========================================
 # 🔐 LOGIN SCREEN (DARK MODE)
